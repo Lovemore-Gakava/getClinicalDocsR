@@ -7,6 +7,8 @@ library(dplyr)
 library(tidyr)
 library(DT)
 library(stringr)
+library(shinyjs)  # required for highlighting
+library(zip)
 
 source("modules/searchModule.R")
 source("modules/studiesModule.R")
@@ -18,12 +20,12 @@ ui <- dashboardPage(
   dashboardHeader(title = "ClinicalTrials.gov Document Viewer"),
   dashboardSidebar(searchModuleUI("search")),
   dashboardBody(
+    useShinyjs(),
     tabBox(
       width = 12,
       id = "mainTabs",
       tabPanel("Studies",
-               actionButton("bookmarkBtn", "Bookmark Selected PDFs", icon = icon("bookmark")),
-               actionButton("deselectBtn", "Deselect Selected PDFs", icon = icon("times")),
+               bookmarkActionsUI("bookmarks"),
                studiesModuleUI("studies")
       ),
       tabPanel("Bookmarked PDFs", bookmarkModuleUI("bookmarks"))
@@ -38,14 +40,6 @@ server <- function(input, output, session) {
   bookmarked_pdfs <- callModule(bookmarkModule, "bookmarks", studies_data, selected_rows)
   callModule(pdfViewerModule, "pdfViewer", selected_rows)
   callModule(downloadModule, "download", selected_rows, bookmarked_pdfs)
-
-  observeEvent(input$bookmarkBtn, {
-    session$sendCustomMessage("bookmark", list(action = "add"))
-  })
-
-  observeEvent(input$deselectBtn, {
-    session$sendCustomMessage("bookmark", list(action = "remove"))
-  })
 }
 
 shinyApp(ui, server)
