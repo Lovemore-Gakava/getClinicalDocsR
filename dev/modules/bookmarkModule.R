@@ -1,7 +1,9 @@
 bookmarkModuleUI <- function(id) {
   ns <- NS(id)
   tagList(
-    DTOutput(ns("bookmarkedTable")),
+    div(style = "overflow-x:auto;",
+        DTOutput(ns("bookmarkedTable"))
+    ),
     fluidRow(
       box(
         title = "PDF Viewer",
@@ -25,6 +27,17 @@ bookmarkModuleUI <- function(id) {
     )
   )
 }
+
+bookmarkActionsUI <- function(id) {
+  ns <- NS(id)
+  tagList(
+    actionButton(ns("bookmarkBtn"), "Bookmark Selected PDFs", icon = icon("bookmark"),
+                 title = "Add selected studies to your bookmarks"),
+    actionButton(ns("deselectBtn"), "Deselect Selected PDFs", icon = icon("times"),
+                 title = "Remove selected studies from your bookmarks")
+  )
+}
+
 
 bookmarkModule <- function(input, output, session, studies_data, selected_rows) {
   bookmarked <- reactiveVal(data.frame(
