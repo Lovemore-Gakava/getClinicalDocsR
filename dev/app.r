@@ -42,4 +42,4 @@ server <- function(input, output, session) {
   callModule(downloadModule, "download", selected_rows, bookmarked_pdfs)
 }
 
-shinyApp(ui, server)
+shiny::shinyApp(ui, server)
