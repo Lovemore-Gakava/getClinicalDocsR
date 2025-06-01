@@ -76,7 +76,7 @@ searchModuleUI <- function(id) {
       div(
         style = "margin-bottom: 10px;",
         numericInput(ns("pageSize"), "Maximum Results:", 
-                    value = 100, min = 1, max = 1000,
+                    value = 1000, min = 1, max = 50000,
                     width = "100%")
       )
     ),
@@ -84,14 +84,15 @@ searchModuleUI <- function(id) {
     # Options section
     div(
       style = "margin-bottom: 25px; padding: 15px; background-color: white; border-radius: 8px; border: 1px solid #e9ecef;",
-      h5("Options", style = "color: #495057; margin-bottom: 15px; margin-top: 0;"),
+      h5("Downloadable Studies", style = "color: #495057; margin-bottom: 15px; margin-top: 0;"),
       
       div(
-        style = "margin-bottom: 10px;",
+        style = "margin-bottom: 0px; display: flex; align-items: center; height: 32px;",
         checkboxInput(ns("documentsOnly"), 
-                     "Only show studies with downloadable documents", 
-                     value = TRUE,
-                     width = "100%")
+                     "Show only studies with downloadable documents", 
+                     value = FALSE,
+                     width = "auto"),
+        style = "margin: 0; padding: 0;"
       )
     ),
       # Action buttons
@@ -239,7 +240,8 @@ searchModule <- function(input, output, session) {
       showNotification("Please enter at least a condition or intervention to search.", 
                       type = "warning")
       return()
-    }      # Validate date is not in future - handle NULL and NA values properly
+    }
+    # Validate date is not in future - handle NULL and NA values properly
     if(!is.null(input$startDate) && !is.na(input$startDate)) {
       if(input$startDate > Sys.Date()) {
         showNotification("Date cannot be in the future. Please select a past date.", 
@@ -253,21 +255,15 @@ searchModule <- function(input, output, session) {
     
     withProgress(message = 'Searching ClinicalTrials.gov...', value = 0, {
       base_url <- "https://clinicaltrials.gov/api/v2/studies"
-      
-      # Build query parameters using more reliable approach
       query_params <- build_query_params()
-      
       incProgress(0.2, detail = "Connecting to API...")
-      
       tryCatch({
         start_time <- Sys.time()
-          page_data <- fetch_page(base_url, query_params)
-        
+        page_data <- fetch_page(base_url, query_params)
         incProgress(0.3, detail = "Processing study data...")        
         if("studies" %in% names(page_data)) {
           # Studies field exists, proceed with processing
         }
-        
         # Check for studies and convert to dataframe properly
         if(!"studies" %in% names(page_data) || length(page_data$studies) == 0) {
           showNotification("No studies found matching your criteria. Try broader search terms.", type = "warning")
@@ -279,7 +275,7 @@ searchModule <- function(input, output, session) {
                          sep = "=", collapse = " & "),
             search_time = as.numeric(difftime(Sys.time(), start_time, units = "secs"))
           ))
-            insertUI(
+          insertUI(
             selector = paste0("#", session$ns("searchStatus")),
             where = "beforeEnd",
             ui = div(class = "alert alert-warning",
@@ -287,38 +283,25 @@ searchModule <- function(input, output, session) {
           )
           return()
         }
-          # Convert studies to data frame like in the working POC
         studies <- as.data.frame(page_data$studies)
-        
         incProgress(0.3, detail = "Processing documents...")
-        # Handle document section more carefully - check actual structure first
         studies_with_docs <- studies
-        
-        # Check for documents in the actual structure
         doc_fields <- names(studies)[grepl('document|doc', names(studies), ignore.case = TRUE)]
         cat("Document-related fields found:", paste(doc_fields, collapse = ", "), "\n")
-        
         # Try to find and unnest documents if they exist
         if(length(doc_fields) > 0) {
-          # Look for the specific document field
           large_doc_field <- doc_fields[grepl('largeDocs|largeDocumentModule', doc_fields)]
-          
           if(length(large_doc_field) > 0 && any(!is.na(studies[[large_doc_field[1]]]))) {
             tryCatch({
-              # Use dynamic field name for unnesting
               studies_with_docs <- studies |>
                 tidyr::unnest(cols = all_of(large_doc_field[1]), 
-                             keep_empty = !input$documentsOnly)
+                             keep_empty = TRUE) # Always keep all studies
             }, error = function(e) {
               cat("Unnesting failed, using original data structure:", e$message, "\n")
               studies_with_docs <- studies
             })
           }
-        } else if(input$documentsOnly) {
-          showNotification("No studies with documents found. Try unchecking 'documents only' option.", type = "warning")
-          studies_data(NULL)
-          return()
-        }
+        } 
         
         incProgress(0.2, detail = "Building document URLs...")
           # Build document URLs more safely using actual field names
@@ -334,7 +317,6 @@ searchModule <- function(input, output, session) {
         } else {
           nct_ids <- rep(NA_character_, nrow(studies_with_docs))
         }
-        # Assign NCT IDs as a proper column on the data frame
         studies_with_docs$nct_id <- nct_ids
         
         # Build studies_updated and assign docpath directly
@@ -374,15 +356,8 @@ searchModule <- function(input, output, session) {
           }
         }
         
-        # Filter out studies without documents if requested
-        if(input$documentsOnly) {
-          studies_updated <- studies_updated |>
-            filter(!is.na(docpath) & nzchar(docpath))
-        }
-        
         end_time <- Sys.time()
         search_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
-        
         studies_data(studies_updated)
         search_info(list(
           total_studies = nrow(studies_updated),
@@ -489,7 +464,14 @@ searchModule <- function(input, output, session) {
   })
   
   return(list(
-    data = studies_data,
+    data = reactive({
+      df <- studies_data()
+      if (is.null(df)) return(NULL)
+      if (isTRUE(input$documentsOnly)) {
+        df <- df[!is.na(df$docpath) & nzchar(df$docpath), ]
+      }
+      df
+    }),
     info = search_info
   ))
 }

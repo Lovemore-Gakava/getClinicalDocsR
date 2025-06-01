@@ -26,7 +26,7 @@ studiesModule <- function(input, output, session, studies_data) {
               nrow(data), docs_count)
     }
   })
-    output$studiesTable <- renderDT({
+  output$studiesTable <- renderDT({
     req(studies_data())
     data <- studies_data()
     
@@ -81,15 +81,35 @@ studiesModule <- function(input, output, session, studies_data) {
       }
     }
     
+    # Only allow selection for rows with a downloadable document
+    selectable <- !is.na(data$docpath) & nzchar(data$docpath)
     datatable(
       display_data,
-      selection = "single", # Match bookmarkedTable selection style
+      selection = list(mode = "multiple", target = "row", selectable = which(selectable)),
       options = list(
-        pageLength = 10, # Match bookmarkedTable page length
-        searchHighlight = TRUE
+        pageLength = 100, # Match bookmarkedTable page length
+        searchHighlight = TRUE,
+        dom = 'Bfrtip', # Enable Buttons toolbar
+        buttons = c('colvis') # Add column visibility button
       ),
+      extensions = 'Buttons',
       rownames = FALSE
     )
+  })
+  
+  observeEvent(input$studiesTable_rows_selected, {
+    data <- studies_data()
+    selected <- input$studiesTable_rows_selected
+    if (length(selected) > 0) {
+      # Check if any selected rows do not have a downloadable document
+      invalid <- selected[is.na(data$docpath[selected]) | !nzchar(data$docpath[selected])]
+      if (length(invalid) > 0) {
+        showNotification("Only studies with downloadable documents can be selected.", type = "warning")
+        # Deselect invalid rows
+        proxy <- dataTableProxy("studiesTable")
+        selectRows(proxy, selected[!selected %in% invalid])
+      }
+    }
   })
   
   return(reactive({

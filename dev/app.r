@@ -73,6 +73,13 @@ ui <- dashboardPage(
         table.dataTable tr {
           min-height: 0 !important;
         }
+
+        .main-sidebar, .main-sidebar * {
+          color: #222 !important;
+        }
+        .sidebar, .sidebar * {
+          color: #222 !important;
+        }
       "))
     ),
     

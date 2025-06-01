@@ -93,8 +93,8 @@ bookmarkModule <- function(input, output, session, studies_data, selected_rows) 
   output$pdfViewer <- renderUI({
     req(input$bookmarkedTable_rows_selected)
     selected <- bookmarked()[input$bookmarkedTable_rows_selected, , drop = FALSE]
-    req(nrow(selected) == 1, !is.na(selected$docpath))
-    tags$iframe(src = selected$docpath, width = "100%", height = "800px")
+    req(nrow(selected) == 1, !is.na(selected$docpath), nzchar(selected$docpath))
+    tags$iframe(src = selected$docpath, width = "100%", height = "800px", frameborder = 0)
   })
 
   output$fileSizeInfo <- renderText({
